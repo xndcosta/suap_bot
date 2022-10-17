@@ -1,14 +1,15 @@
-from tkinter.ttk import Separator
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
-
 import discord
+import pickle
 
 USERNAME = ''
 PASSWORD = ''
 DISCORD_TOKEN = ''
-
+ 
 def remove_unicode( str ):
     encoded_string = str.encode( 'ascii', 'ignore' )
     return encoded_string.decode( )
@@ -23,7 +24,8 @@ async def on_ready( ):
     chrome_options.add_argument( '--window-size=1920,1080' )
 
     #  Login
-    driver = webdriver.Chrome( chrome_options= chrome_options )
+    print( '[!] Logando')
+    driver = webdriver.Chrome( service= Service( ChromeDriverManager( ).install( ) ), options= chrome_options )
     driver.get( 'https://suap.ifsuldeminas.edu.br/accounts/login/' )
 
     box = driver.find_element( By.NAME, 'username' )
@@ -37,65 +39,59 @@ async def on_ready( ):
 
 
     # Scrap boletim
+    print( '[!] Scraping')
     driver.get( 'https://suap.ifsuldeminas.edu.br/djtools/breadcrumbs_reset/ensino_boletins/edu/boletim_aluno/' )
-
-    detalhes_materia = driver.find_elements( By.LINK_TEXT, 'Detalhar' )
-    links_materias = [ _.get_attribute( 'href' ) for _ in detalhes_materia ]
-    notas = []
-
+    
+    materias = dict( )
+    links_materias = [ _.get_attribute( 'href' ) for _ in driver.find_elements( By.LINK_TEXT, 'Detalhar' ) ]
     for link in links_materias:
         driver.get( link )
         
-        box = driver.find_element( By.TAG_NAME, 'h2' )
-        notas_materia = []
-        notas_materia.append( remove_unicode( box.get_attribute( 'innerHTML' )[ 7: ] ) )
+        nome_materia = remove_unicode( driver.find_element( By.TAG_NAME, 'h2' ).get_attribute( 'innerHTML' )[ 7: ] )
+        materias[ nome_materia ] = list( )
         
-        box = driver.find_element( By.TAG_NAME, 'tbody' )
-        notas_box = box.find_elements( By.TAG_NAME, 'tr' )
-        
-        for nota in notas_box:
-            temp_box = nota.find_elements( By.TAG_NAME, 'td' )
-            nota = temp_box[ len( temp_box ) - 1 ].get_attribute( 'innerHTML' )
-            notas_materia.append( nota )
+        tabela = driver.find_element( By.TAG_NAME, 'tbody' )
+        linhas = tabela.find_elements( By.TAG_NAME, 'tr' )
+        for l in linhas:
+            col = l.find_elements( By.TAG_NAME, 'td' )
             
-        notas.append( notas_materia )
+            atividade = col[ 0 ].get_attribute( 'innerHTML' )
+            nota = col[ 5 ].get_attribute( 'innerHTML' )
+            
+            materias[nome_materia].append( [ atividade, nota ] )
             
     driver.close( )
 
     # Verificação das notas
-    linhas = []
-    materias = []
-    novo = True
+    print( '[!] Verificando')
 
-    with open( 'notas.txt', 'r', encoding = 'utf8' ) as arq:
-        linhas = arq.readlines( )
-        
-        for i in range( len( linhas ) ):
-            linhas[ i ] = linhas[ i ].split( ';' )
-            
-            if len( linhas[ i ] ) - 1 != len( notas[ i ] ):
-                materias.append( linhas[i][0] )
-                novo = True
-            else:
-                for j in range( len( linhas[ i ] ) - 1 ):
-                    if remove_unicode( linhas[ i ][ j ] ) != remove_unicode( notas[ i ][ j ] ):
-                        materias.append( notas[ i ][ 0 ] )
-                        novo = True
-                        break
-        
+    with open( 'D:/Users/alexa/Desktop/Programacao/suap-if-passos/notas.pkl', 'rb' ) as arq:
+        materias_arq = pickle.load( arq )
+        novo = { k: materias[ k ] for k in materias if k in materias_arq and materias[ k ] != materias_arq[ k ] }
+           
     if novo:
-        for server in client.guilds:
-            channel = discord.utils.get( server.channels, name = "notas" )
-            
-        title = 'Nota nova'
-        embed = discord.Embed( title = title, description = [ f'{_}\n' for _ in materias ], color = discord.Color.blue( ), url = 'https://suap.ifsuldeminas.edu.br/accounts/login' )
-        await channel.send( embed = embed )
+        print( '[!] Notas novas' )
         
-        with open( 'notas.txt', 'w', encoding = 'utf8' ) as arq:
-            for linha in notas:
-                for nota in linha:
-                    arq.write( f'{nota};' )
-                arq.write( '\n' )
+        for server in client.guilds:
+            channel = discord.utils.get( server.channels, name= "📓suap" )
+            
+            title = 'Nota nova'
+            text = ''
+            for materia in materias:
+                text += f'{materia}\n'
+                for atv in materias[materia]:
+                    text += f'\t- {atv[ 0 ]}\n'
                 
-client.run( DISCORD_TOKEN )
+            embed = discord.Embed( title= title, description= text, color= discord.Color.blue( ), url= 'https://suap.ifsuldeminas.edu.br/accounts/login' )
+
+            await channel.send( embed= embed )
+        
+        print( '[!] Reescrevendo notas' )
+        
+        with open( 'D:/Users/alexa/Desktop/Programacao/suap-if-passos/notas.pkl', 'wb') as arq:
+            pickle.dump( novo, arq, protocol= -1 )
+
+    await client.close()
+                
+client.run( DISCORD_TOKEN, log_handler = None )
         
