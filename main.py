@@ -5,6 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 import discord
 import pickle
+import os
 
 USERNAME = ''
 PASSWORD = ''
@@ -65,9 +66,13 @@ async def on_ready( ):
     # Verificação das notas
     print( '[!] Verificando')
 
-    with open( 'D:/Users/alexa/Desktop/Programacao/suap-if-passos/notas.pkl', 'rb' ) as arq:
-        materias_arq = pickle.load( arq )
-        novo = { k: materias[ k ] for k in materias if k in materias_arq and materias[ k ] != materias_arq[ k ] }
+    if not 'notas.pkl' in [ f for f in os.listdir( ) ]:
+        with open( 'notas.pkl', 'wb' ) as arq:
+            novo = materias
+    else:
+        with open( 'notas.pkl', 'rb' ) as arq:
+            materias_arq = pickle.load( arq )
+            novo = { _: materias[ _ ] for _ in materias if _ in materias_arq and materias[ _ ] != materias_arq[ _ ] }
            
     if novo:
         print( '[!] Notas novas' )
@@ -83,13 +88,13 @@ async def on_ready( ):
                     text += f'\t- {atv[ 0 ]}\n'
                 
             embed = discord.Embed( title= title, description= text, color= discord.Color.blue( ), url= 'https://suap.ifsuldeminas.edu.br/accounts/login' )
-
-            await channel.send( embed= embed )
+            
+            await channel.send( content= '@Suap', embed= embed )
         
         print( '[!] Reescrevendo notas' )
         
-        with open( 'D:/Users/alexa/Desktop/Programacao/suap-if-passos/notas.pkl', 'wb') as arq:
-            pickle.dump( novo, arq, protocol= -1 )
+        with open( 'notas.pkl', 'wb') as arq:
+            pickle.dump( novo, arq, protocol= pickle.HIGHEST_PROTOCOL )
 
     await client.close()
                 
