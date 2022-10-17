@@ -1,7 +1,1 @@
-Estrutura de Dados II;-;-;
-Matemtica Computacional;-;0,5;1,0;1,0;-;-;-;-;
-Paradigmas de Linguagens de Programao;1,8;-;-;-;
-Probabilidade e Estatstica;2,6;-;-;
-Projeto e Anlise de Algoritmos;1,1;-;-;-;-;
-Redes de Computadores I;-;-;
-Teoria dos Grafos;2,2;-;-;1,9;
+
